@@ -1,0 +1,27 @@
+{
+  "id": "smoke-auth",
+  "name": "Smoke de autenticacao",
+  "description": "Abre homologacao, valida tela de login e registra screenshot.",
+  "url": "https://homolog.amazhealth.com.br/",
+  "stopOnFailure": true,
+  "steps": [
+    {
+      "action": "waitForLoadState",
+      "state": "domcontentloaded"
+    },
+    {
+      "action": "waitForURL",
+      "url": "**/auth",
+      "timeout": 15000
+    },
+    {
+      "action": "expectURL",
+      "contains": "/auth"
+    },
+    {
+      "action": "screenshot",
+      "name": "smoke-auth-final",
+      "fullPage": true
+    }
+  ]
+}

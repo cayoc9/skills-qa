@@ -1,0 +1,16 @@
+# Local/editor state
+.DS_Store
+.idea/
+.vscode/
+
+# Runtime dependencies and generated artifacts
+node_modules/
+package-lock.json
+.qa-browser/
+*.log
+
+# Local collections not included in the shareable package
+copiadas/
+em-desenvolvimento/
+apontamentos/
+skills_in_dev

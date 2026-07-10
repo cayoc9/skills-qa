@@ -1,0 +1,4 @@
+interface:
+  display_name: "QA Browser Session"
+  short_description: "Homologacao browser com evidencias"
+  default_prompt: "Use QA Browser Session para iniciar uma sessao manual ou assistida de homologacao, capturar trace/HAR/video/screenshot e manter dados locais do projeto."

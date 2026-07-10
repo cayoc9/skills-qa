@@ -1,0 +1,9 @@
+{
+  "name": "qa-browser-session-skill",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "qa-browser": "scripts/qa-browser.mjs"
+  }
+}

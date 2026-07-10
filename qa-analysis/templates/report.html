@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Relatório de Análise de QA — {{SYSTEM_NAME}}</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #232733;
+    --border: #2d3244;
+    --text: #e4e4e7;
+    --text-muted: #9ca3af;
+    --accent: #6366f1;
+    --green: #22c55e;
+    --amber: #f59e0b;
+    --red: #ef4444;
+    --cyan: #06b6d4;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    padding: 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  h1 {
+    font-size: 2rem;
+    background: linear-gradient(135deg, var(--accent), var(--cyan));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 0.5rem;
+  }
+  .subtitle { color: var(--text-muted); margin-bottom: 2rem; border-bottom: 1px solid var(--border); padding-bottom: 1.5rem; }
+  h2 { font-size: 1.4rem; color: var(--accent); margin: 2rem 0 1rem; }
+  h3 { font-size: 1.1rem; color: var(--cyan); margin: 1.5rem 0 0.75rem; }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin: 1rem 0;
+  }
+  .card-green { border-left: 3px solid var(--green); }
+  .card-amber { border-left: 3px solid var(--amber); }
+  .card-red { border-left: 3px solid var(--red); }
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+    margin: 1.5rem 0;
+  }
+  .stat-card {
+    background: var(--surface2);
+    border-radius: 10px;
+    padding: 1.25rem;
+    text-align: center;
+  }
+  .stat-value {
+    font-size: 2rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--accent), var(--cyan));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .stat-label { color: var(--text-muted); font-size: 0.85rem; margin-top: 0.25rem; }
+  table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.9rem; }
+  th { background: var(--surface2); padding: 0.75rem 1rem; text-align: left; color: var(--accent); border-bottom: 2px solid var(--border); }
+  td { padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); }
+  .check { color: var(--green); }
+  .cross { color: var(--red); }
+  .warn { color: var(--amber); }
+  .tag { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
+  .tag-pass { background: rgba(34,197,94,0.15); color: var(--green); }
+  .tag-warn { background: rgba(245,158,11,0.15); color: var(--amber); }
+  .tag-fail { background: rgba(239,68,68,0.15); color: var(--red); }
+  .maturity-bar {
+    height: 24px;
+    background: var(--surface2);
+    border-radius: 12px;
+    overflow: hidden;
+    margin: 0.5rem 0;
+  }
+  .maturity-fill {
+    height: 100%;
+    border-radius: 12px;
+    transition: width 0.5s;
+  }
+  .timeline {
+    border-left: 2px solid var(--border);
+    padding-left: 1.5rem;
+    margin: 1rem 0;
+  }
+  .timeline-item {
+    position: relative;
+    margin-bottom: 1.5rem;
+  }
+  .timeline-item::before {
+    content: '';
+    width: 12px;
+    height: 12px;
+    background: var(--accent);
+    border-radius: 50%;
+    position: absolute;
+    left: -1.85rem;
+    top: 0.3rem;
+  }
+  .timeline-item h4 { color: var(--cyan); font-size: 0.95rem; }
+  .timeline-item .time { color: var(--text-muted); font-size: 0.8rem; }
+</style>
+</head>
+<body>
+
+<h1>Relatório de Análise de QA</h1>
+<p class="subtitle">{{SYSTEM_NAME}} — {{DATE}}</p>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- EXECUTIVE SUMMARY -->
+<!-- ═══════════════════════════════════════════ -->
+
+<h2>1. Executive Summary</h2>
+
+<div class="stat-grid">
+  <div class="stat-card">
+    <div class="stat-value">{{MATURITY_LEVEL}}</div>
+    <div class="stat-label">Nível de Maturidade Atual</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value">{{TARGET_LEVEL}}</div>
+    <div class="stat-label">Nível Alvo (12 meses)</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value">{{SAVINGS_PCT}}%</div>
+    <div class="stat-label">Economia Potencial</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value">{{ISSUES_COUNT}}</div>
+    <div class="stat-label">Problemas Críticos</div>
+  </div>
+</div>
+
+<div class="card {{SUMMARY_CARD_CLASS}}">
+  <h3>Diagnóstico Geral</h3>
+  <p>{{SUMMARY_TEXT}}</p>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- CONTEXTO -->
+<!-- ═══════════════════════════════════════════ -->
+
+<h2>2. Contexto do Sistema</h2>
+
+<table>
+  <tr><th>Dimensão</th><th>Valor</th></tr>
+  <tr><td>Stack Tecnológico</td><td>{{STACK}}</td></tr>
+  <tr><td>Domínio</td><td>{{DOMAIN}}</td></tr>
+  <tr><td>Arquitetura</td><td>{{ARCHITECTURE}}</td></tr>
+  <tr><td>Ambientes</td><td>{{ENVIRONMENTS}}</td></tr>
+  <tr><td>Regulamentações</td><td>{{REGULATIONS}}</td></tr>
+  <tr><td>Volume de Usuários</td><td>{{USER_VOLUME}}</td></tr>
+</table>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- MATURIDADE -->
+<!-- ═══════════════════════════════════════════ -->
+
+<h2>3. Análise de Maturidade</h2>
+
+<h3>3.1 Testes Automatizados</h3>
+<table>
+  <tr><th>Categoria</th><th>Status</th><th>Detalhes</th></tr>
+  <tr><td>Testes Unitários</td><td>{{UNIT_STATUS}}</td><td>{{UNIT_DETAILS}}</td></tr>
+  <tr><td>Testes de Integração</td><td>{{INTEGRATION_STATUS}}</td><td>{{INTEGRATION_DETAILS}}</td></tr>
+  <tr><td>Testes E2E</td><td>{{E2E_STATUS}}</td><td>{{E2E_DETAILS}}</td></tr>
+  <tr><td>Testes de API</td><td>{{API_STATUS}}</td><td>{{API_DETAILS}}</td></tr>
+  <tr><td>Testes Visuais</td><td>{{VISUAL_STATUS}}</td><td>{{VISUAL_DETAILS}}</td></tr>
+  <tr><td>Testes de Performance</td><td>{{PERF_STATUS}}</td><td>{{PERF_DETAILS}}</td></tr>
+</table>
+
+<h3>3.2 Observabilidade</h3>
+<table>
+  <tr><th>Componente</th><th>Status</th><th>Ferramenta</th></tr>
+  <tr><td>Logs Estruturados</td><td>{{LOGS_STATUS}}</td><td>{{LOGS_TOOL}}</td></tr>
+  <tr><td>Traces Distribuídos</td><td>{{TRACES_STATUS}}</td><td>{{TRACES_TOOL}}</td></tr>
+  <tr><td>Métricas</td><td>{{METRICS_STATUS}}</td><td>{{METRICS_TOOL}}</td></tr>
+  <tr><td>Error Tracking</td><td>{{ERROR_STATUS}}</td><td>{{ERROR_TOOL}}</td></tr>
+  <tr><td>Session Replay</td><td>{{REPLAY_STATUS}}</td><td>{{REPLAY_TOOL}}</td></tr>
+  <tr><td>Product Analytics</td><td>{{ANALYTICS_STATUS}}</td><td>{{ANALYTICS_TOOL}}</td></tr>
+</table>
+
+<h3>3.3 Automação com IA</h3>
+<table>
+  <tr><th>Capacidade</th><th>Status</th><th>Notas</th></tr>
+  <tr><td>Self-Healing Tests</td><td>{{SELFHEAL_STATUS}}</td><td>{{SELFHEAL_NOTES}}</td></tr>
+  <tr><td>Geração Automática de Testes</td><td>{{GENTEST_STATUS}}</td><td>{{GENTEST_NOTES}}</td></tr>
+  <tr><td>Anomaly Detection</td><td>{{ANOMALY_STATUS}}</td><td>{{ANOMALY_NOTES}}</td></tr>
+  <tr><td>Root Cause Analysis</td><td>{{RCA_STATUS}}</td><td>{{RCA_NOTES}}</td></tr>
+</table>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- COMPLIANCE -->
+<!-- ═══════════════════════════════════════════ -->
+
+<h2>4. Análise de Compliance</h2>
+
+<h3>4.1 LGPD</h3>
+<table>
+  <tr><th>Requisito</th><th>Status</th><th>Ação Necessária</th></tr>
+  <tr><td>Dados sensíveis identificados</td><td>{{LGPD_SENSITIVE}}</td><td>{{LGPD_SENSITIVE_ACTION}}</td></tr>
+  <tr><td>Mascaramento de dados</td><td>{{LGPD_MASK}}</td><td>{{LGPD_MASK_ACTION}}</td></tr>
+  <tr><td>Session replay compliant</td><td>{{LGPD_REPLAY}}</td><td>{{LGPD_REPLAY_ACTION}}</td></tr>
+  <tr><td>Política de privacidade</td><td>{{LGPD_POLICY}}</td><td>{{LGPD_POLICY_ACTION}}</td></tr>
+  <tr><td>Audit trails</td><td>{{LGPD_AUDIT}}</td><td>{{LGPD_AUDIT_ACTION}}</td></tr>
+  <tr><td>Dados de teste anonimizados</td><td>{{LGPD_TESTDATA}}</td><td>{{LGPD_TESTDATA_ACTION}}</td></tr>
+</table>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- CUSTOS -->
+<!-- ═══════════════════════════════════════════ -->
+
+<h2>5. Análise de Custos</h2>
+
+<h3>5.1 Ferramentas Atuais</h3>
+<table>
+  <tr><th>Categoria</th><th>Ferramenta</th><th>Tipo</th><th>Custo/mês</th></tr>
+  {{COST_ROWS}}
+</table>
+
+<h3>5.2 Comparativo SaaS vs Open-Source</h3>
+<div class="stat-grid">
+  <div class="stat-card">
+    <div class="stat-value">${{CURRENT_COST}}</div>
+    <div class="stat-label">Custo Atual (SaaS)</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value">${{OSS_COST}}</div>
+    <div class="stat-label">Custo Open-Source</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value">${{SAVINGS}}</div>
+    <div class="stat-label">Economia Mensal</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- ROADMAP -->
+<!-- ═══════════════════════════════════════════ -->
+
+<h2>6. Roadmap de Melhorias</h2>
+
+<div class="timeline">
+  <div class="timeline-item">
+    <h4>Quick Wins (0-30 dias)</h4>
+    <p class="time">Alto impacto, baixo esforço</p>
+    <ul style="padding-left: 1rem; margin-top: 0.5rem;">
+      {{QUICK_WINS}}
+    </ul>
+  </div>
+  <div class="timeline-item">
+    <h4>Curto Prazo (1-3 meses)</h4>
+    <p class="time">Fundação para melhorias</p>
+    <ul style="padding-left: 1rem; margin-top: 0.5rem;">
+      {{SHORT_TERM}}
+    </ul>
+  </div>
+  <div class="timeline-item">
+    <h4>Médio Prazo (3-6 meses)</h4>
+    <p class="time">Automação com IA</p>
+    <ul style="padding-left: 1rem; margin-top: 0.5rem;">
+      {{MEDIUM_TERM}}
+    </ul>
+  </div>
+  <div class="timeline-item">
+    <h4>Longo Prazo (6-12 meses)</h4>
+    <p class="time">Sistema integrado</p>
+    <ul style="padding-left: 1rem; margin-top: 0.5rem;">
+      {{LONG_TERM}}
+    </ul>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- ROI -->
+<!-- ═══════════════════════════════════════════ -->
+
+<h2>7. Estimativa de ROI</h2>
+
+<table>
+  <tr><th>Métrica</th><th>Atual</th><th>Projetado</th><th>Delta</th></tr>
+  <tr><td>Fault Detection Rate</td><td>{{FDR_CURRENT}}</td><td>{{FDR_PROJECTED}}</td><td style="color: var(--green);">{{FDR_DELTA}}</td></tr>
+  <tr><td>MTTD</td><td>{{MTTD_CURRENT}}</td><td>{{MTTD_PROJECTED}}</td><td style="color: var(--green);">{{MTTD_DELTA}}</td></tr>
+  <tr><td>MTTR</td><td>{{MTTR_CURRENT}}</td><td>{{MTTR_PROJECTED}}</td><td style="color: var(--green);">{{MTTR_DELTA}}</td></tr>
+  <tr><td>Bug Escape Rate</td><td>{{BER_CURRENT}}</td><td>{{BER_PROJECTED}}</td><td style="color: var(--green);">{{BER_DELTA}}</td></tr>
+  <tr><td>Custo Mensal QA</td><td>${{COST_CURRENT}}</td><td>${{COST_PROJECTED}}</td><td style="color: var(--green);">-${{COST_SAVINGS}}</td></tr>
+</table>
+
+<div class="card card-green">
+  <h3>Payback Estimado</h3>
+  <p>Com investimento de <strong>${{INVESTMENT}}</strong> em implementação e economia mensal de <strong>${{MONTHLY_SAVINGS}}</strong>, o payback estimado é de <strong>{{PAYBACK_MONTHS}} meses</strong>.</p>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- RISCOS -->
+<!-- ═══════════════════════════════════════════ -->
+
+<h2>8. Riscos e Mitigações</h2>
+
+<table>
+  <tr><th>Risco</th><th>Probabilidade</th><th>Impacto</th><th>Mitigação</th></tr>
+  {{RISK_ROWS}}
+</table>
+
+<footer style="margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--border); color: var(--text-muted); font-size: 0.8rem; text-align: center;">
+  Gerado por QA Analysis Skill — {{DATE}}<br>
+  Baseado em pesquisa profunda com 51+ fontes acadêmicas e da indústria
+</footer>
+
+</body>
+</html>
