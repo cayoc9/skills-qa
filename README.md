@@ -1,4 +1,4 @@
-# Skills
+# Skills QA
 
 Repositorio de skills locais para agentes, com foco inicial em QA e validacao
 de navegador.
@@ -14,8 +14,8 @@ de navegador.
 ## Instalacao Rapida
 
 ```bash
-git clone git@github.com:cayoc9/skills.git
-cd skills
+git clone git@github.com:cayoc9/skills-qa.git
+cd skills-qa
 ./scripts/install-local.sh
 ```
 
