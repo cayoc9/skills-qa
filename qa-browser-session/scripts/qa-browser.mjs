@@ -99,6 +99,9 @@ const eventsPath = path.join(runDir, 'events.json');
 const summaryPath = path.join(runDir, 'summary.json');
 const transcriptPath = path.join(runDir, 'ai-transcript.jsonl');
 const finalScreenshotPath = path.join(runDir, 'final-screenshot.png');
+const liveScreenshotDir = path.join(runDir, 'live-screenshots');
+const liveTraceDir = path.join(runDir, 'live-traces');
+const liveSummaryPath = path.join(runDir, 'live-summary.json');
 const playbookResultPath = path.join(runDir, 'playbook-result.json');
 const headless = Boolean(args.headless) || process.env.CI === 'true';
 const mode = args.mode || profileConfig.mode || (headless ? 'headless' : 'manual');
@@ -116,19 +119,114 @@ if (remoteDebuggingPort && !browserTarget.supportsCdp) {
 }
 
 await fs.mkdir(videoDir, { recursive: true });
+await fs.mkdir(liveScreenshotDir, { recursive: true });
+await fs.mkdir(liveTraceDir, { recursive: true });
 if (profileDir) {
   await fs.mkdir(profileDir, { recursive: true });
 }
 
 const events = [];
 let playbookResult = null;
+let page = null;
+let liveFlushTimer = null;
+let liveScreenshotTimer = null;
+let liveScreenshotSequence = 0;
+let liveFlushChain = Promise.resolve();
+let liveScreenshotChain = Promise.resolve();
+let liveTraceTimer = null;
+let liveTraceSequence = 0;
+let liveTraceChunkActive = false;
+let liveTraceChain = Promise.resolve();
+let lastLiveTraceChunkPath = null;
+let resolveSessionStop;
+const sessionStop = new Promise((resolve) => {
+  resolveSessionStop = resolve;
+});
 const addEvent = (type, payload = {}) => {
   events.push(redactValue({
     ts: new Date().toISOString(),
     type,
     ...payload
   }, redaction));
+  scheduleLiveFlush();
 };
+
+function scheduleLiveFlush() {
+  if (liveFlushTimer) return;
+  liveFlushTimer = setTimeout(() => {
+    liveFlushTimer = null;
+    void flushLiveArtifacts();
+  }, 750);
+}
+
+async function flushLiveArtifacts() {
+  const snapshot = redactValue({
+    updatedAt: new Date().toISOString(),
+    runDir,
+    totalEvents: events.length,
+    eventsPath,
+    transcriptPath,
+    liveScreenshotDir,
+    capture
+  }, redaction);
+
+  liveFlushChain = liveFlushChain.then(async () => {
+    await fs.writeFile(eventsPath, JSON.stringify(events, null, 2));
+    await fs.writeFile(liveSummaryPath, JSON.stringify(snapshot, null, 2));
+    await fs.writeFile(transcriptPath, toJsonl(buildTranscript({ ...snapshot, endedAt: snapshot.updatedAt }, events)));
+  }).catch((error) => {
+    console.error(`Falha ao persistir evidencia incremental: ${error.message}`);
+  });
+
+  await liveFlushChain;
+}
+
+async function captureLiveScreenshot(reason = 'interval') {
+  if (!page || page.isClosed() || !capture.liveScreenshots) return;
+  liveScreenshotChain = liveScreenshotChain.then(async () => {
+    if (!page || page.isClosed()) return;
+    const sequence = String(++liveScreenshotSequence).padStart(6, '0');
+    const screenshotPath = path.join(liveScreenshotDir, `${sequence}-${sanitizeName(reason)}.png`);
+    try {
+      await page.screenshot({ path: screenshotPath, fullPage: false });
+      addEvent('live-screenshot', { reason, path: screenshotPath });
+    } catch (error) {
+      addEvent('live-screenshot-error', { reason, message: error.message });
+    }
+  }).catch((error) => {
+    addEvent('live-screenshot-chain-error', { reason, message: error.message });
+  });
+  await liveScreenshotChain;
+}
+
+async function flushLiveTraceChunk(reason = 'interval', restart = true) {
+  if (!capture.liveTraceChunks || !liveTraceChunkActive) return;
+  liveTraceChain = liveTraceChain.then(async () => {
+    const sequence = String(++liveTraceSequence).padStart(6, '0');
+    const traceChunkPath = path.join(liveTraceDir, `${sequence}-${sanitizeName(reason)}.zip`);
+    try {
+      await context.tracing.stopChunk({ path: traceChunkPath });
+      liveTraceChunkActive = false;
+      lastLiveTraceChunkPath = traceChunkPath;
+      addEvent('live-trace-chunk', { reason, path: traceChunkPath });
+      if (restart) {
+        await context.tracing.startChunk();
+        liveTraceChunkActive = true;
+      }
+    } catch (error) {
+      addEvent('live-trace-chunk-error', { reason, message: error.message });
+      liveTraceChunkActive = false;
+    }
+  }).catch((error) => {
+    addEvent('live-trace-chain-error', { reason, message: error.message });
+  });
+  await liveTraceChain;
+}
+
+function requestSessionStop(signal) {
+  addEvent('session-stop-requested', { signal });
+  resolveSessionStop?.();
+}
 
 console.log(`Iniciando sessao QA: ${baseUrl}`);
 console.log(`Projeto: ${projectName}`);
@@ -189,49 +287,103 @@ await context.tracing.start({
   snapshots: capture.traceSnapshots,
   sources: capture.traceSources
 });
+if (capture.liveTraceChunks) {
+  await context.tracing.startChunk();
+  liveTraceChunkActive = true;
+}
 
-const page = await context.newPage();
-
-page.on('console', (message) => {
-  addEvent('console', {
-    level: message.type(),
-    text: message.text(),
-    location: message.location()
-  });
+await context.exposeBinding('__qaRecordDomEvent', async (_source, payload) => {
+  addEvent('dom-event', payload);
 });
 
-page.on('pageerror', (error) => {
-  addEvent('pageerror', {
-    message: error.message,
-    stack: error.stack
-  });
-});
-
-page.on('requestfailed', (request) => {
-  addEvent('requestfailed', {
-    url: request.url(),
-    method: request.method(),
-    failure: request.failure()?.errorText
-  });
-});
-
-page.on('response', (response) => {
-  if (response.status() >= 400) {
-    addEvent('http-error', {
-      url: response.url(),
-      status: response.status(),
-      statusText: response.statusText()
+await context.addInitScript({
+  content: `(() => {
+    const describe = (element) => ({
+      tag: element?.tagName || null,
+      id: element?.id || null,
+      role: element?.getAttribute?.('role') || null,
+      ariaLabel: element?.getAttribute?.('aria-label') || null,
+      name: element?.getAttribute?.('name') || null,
+      text: (element?.innerText || element?.textContent || '').trim().slice(0, 160)
     });
-  }
+    const emit = (kind, element) => {
+      if (typeof window.__qaRecordDomEvent === 'function') {
+        window.__qaRecordDomEvent({ kind, element: describe(element), url: location.href });
+      }
+    };
+    document.addEventListener('click', (event) => emit('click', event.target?.closest?.('button,a,[role=button],[role=option],[role=menuitem],input,textarea,select') || event.target), true);
+    document.addEventListener('change', (event) => emit('change', event.target), true);
+    document.addEventListener('submit', (event) => emit('submit', event.target), true);
+  })();`
 });
 
-page.on('framenavigated', (frame) => {
-  if (frame === page.mainFrame()) {
-    addEvent('navigation', {
-      url: frame.url()
+function attachPageListeners(targetPage) {
+  targetPage.on('console', (message) => {
+    addEvent('console', {
+      level: message.type(),
+      text: message.text(),
+      location: message.location()
     });
-  }
+  });
+
+  targetPage.on('pageerror', (error) => {
+    addEvent('pageerror', {
+      message: error.message,
+      stack: error.stack
+    });
+  });
+
+  targetPage.on('requestfailed', (request) => {
+    addEvent('requestfailed', {
+      url: request.url(),
+      method: request.method(),
+      failure: request.failure()?.errorText
+    });
+  });
+
+  targetPage.on('response', (response) => {
+    if (response.status() >= 400) {
+      addEvent('http-error', {
+        url: response.url(),
+        status: response.status(),
+        statusText: response.statusText()
+      });
+    }
+  });
+
+  targetPage.on('framenavigated', (frame) => {
+    if (frame === targetPage.mainFrame()) {
+      addEvent('navigation', { url: frame.url() });
+      setTimeout(() => void captureLiveScreenshot('navigation'), 500);
+    }
+  });
+
+  targetPage.on('close', () => {
+    addEvent('page-closed', { url: targetPage.url() });
+  });
+}
+
+context.on('page', (newPage) => {
+  attachPageListeners(newPage);
 });
+
+page = await context.newPage();
+attachPageListeners(page);
+
+if (capture.liveScreenshots) {
+  liveScreenshotTimer = setInterval(() => {
+    void captureLiveScreenshot('interval');
+  }, Math.max(1000, capture.liveScreenshotIntervalMs));
+}
+if (capture.liveTraceChunks) {
+  liveTraceTimer = setInterval(() => {
+    void flushLiveTraceChunk('interval');
+  }, Math.max(5000, capture.liveTraceIntervalMs));
+}
+
+process.once('SIGINT', () => requestSessionStop('SIGINT'));
+process.once('SIGTERM', () => requestSessionStop('SIGTERM'));
+process.once('SIGUSR2', () => requestSessionStop('SIGUSR2'));
 
 addEvent('run-started', {
   baseUrl,
@@ -280,6 +432,10 @@ try {
     const durationMs = Number(args.duration || 5) * 1000;
     console.log(`Modo automatico: aguardando ${durationMs / 1000}s antes de encerrar.`);
     await page.waitForTimeout(durationMs);
+  } else if (mode === 'assisted') {
+    console.log('Sessao assistida ativa; evidencias incrementais serao persistidas enquanto o browser permanecer aberto.');
+    console.log('Use qa-browser-tmux.sh stop (SIGUSR2) ou envie SIGINT/SIGTERM ao runner para finalizar com trace, HAR, video e screenshot final.');
+    await sessionStop;
   } else {
     console.log('');
     console.log('Homologue manualmente no navegador aberto.');
@@ -291,6 +447,7 @@ try {
   }
 
   if (capture.screenshot) {
+    await liveScreenshotChain;
     await page.screenshot({
       path: finalScreenshotPath,
       fullPage: true
@@ -308,9 +465,38 @@ try {
 } finally {
   const endedAt = new Date();
 
-  await context.tracing.stop({ path: tracePath }).catch((error) => {
-    addEvent('trace-stop-error', { message: error.message });
-  });
+  if (liveFlushTimer) {
+    clearTimeout(liveFlushTimer);
+    liveFlushTimer = null;
+  }
+  if (liveScreenshotTimer) {
+    clearInterval(liveScreenshotTimer);
+    liveScreenshotTimer = null;
+  }
+  if (liveTraceTimer) {
+    clearInterval(liveTraceTimer);
+    liveTraceTimer = null;
+  }
+  await flushLiveTraceChunk('final-before-close', false);
+  await captureLiveScreenshot('final-before-close');
+  await flushLiveArtifacts();
+
+  if (capture.liveTraceChunks) {
+    addEvent('trace-stop-skipped', { reason: 'live-trace-chunks-finalized' });
+  } else {
+    await context.tracing.stop({ path: tracePath }).catch((error) => {
+      addEvent('trace-stop-error', { message: error.message });
+    });
+  }
+
+  try {
+    await fs.access(tracePath);
+  } catch {
+    if (lastLiveTraceChunkPath) {
+      await fs.copyFile(lastLiveTraceChunkPath, tracePath);
+      addEvent('trace-finalized-from-live-chunk', { path: tracePath, source: lastLiveTraceChunkPath });
+    }
+  }
 
   await context.close().catch((error) => {
     addEvent('context-close-error', { message: error.message });
@@ -351,6 +537,8 @@ try {
     transcriptPath,
     playbookResultPath: playbookResult ? playbookResultPath : null,
     finalScreenshotPath,
+    liveScreenshotDir,
+    liveTraceDir,
     events
   }), redaction);
 
@@ -530,7 +718,11 @@ function resolveCaptureOptions(config, profileConfig, args) {
     traceScreenshots: booleanOption(args['trace-screenshots'], merged.traceScreenshots, true),
     traceSnapshots: booleanOption(args['trace-snapshots'], merged.traceSnapshots, true),
     video: booleanOption(args.video, merged.video, true),
-    screenshot: booleanOption(args.screenshot, merged.screenshot, true)
+    screenshot: booleanOption(args.screenshot, merged.screenshot, true),
+    liveScreenshots: booleanOption(args['live-screenshots'], merged.liveScreenshots, true),
+    liveScreenshotIntervalMs: Number(args['live-screenshot-interval-ms'] || merged.liveScreenshotIntervalMs || 15000),
+    liveTraceChunks: booleanOption(args['live-trace-chunks'], merged.liveTraceChunks, true),
+    liveTraceIntervalMs: Number(args['live-trace-interval-ms'] || merged.liveTraceIntervalMs || 30000)
   };
 }
 
@@ -1112,6 +1304,8 @@ function buildSummary({
   transcriptPath,
   playbookResultPath,
   finalScreenshotPath,
+  liveScreenshotDir,
+  liveTraceDir,
   events
 }) {
   const byType = countBy(events, (event) => event.type);
@@ -1159,6 +1353,8 @@ function buildSummary({
       transcriptPath,
       playbookResultPath,
       finalScreenshotPath,
+      liveScreenshotDir,
+      liveTraceDir,
       videoDir: path.join(runDir, 'videos')
     },
     aiReviewPrompt: [

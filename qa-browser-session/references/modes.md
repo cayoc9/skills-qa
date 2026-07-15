@@ -20,6 +20,10 @@ node /home/cayo/.codex/skills/qa-browser-session/scripts/qa-browser.mjs assisted
 
 Use para pares humano+agente. Nao use `--remote-debugging-port` com Firefox/WebKit.
 
+Para manter o processo fora do terminal efemero do agente, execute o runner em
+tmux com `scripts/qa-browser-tmux.sh`. Consulte o pane com `capture` e finalize
+com `stop`; nao dependa de `Enter` no stdin.
+
 ## Headless
 
 Executa smoke curto sem janela.

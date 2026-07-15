@@ -100,6 +100,32 @@ node /home/cayo/.codex/skills/qa-browser-session/scripts/qa-browser.mjs prune \
 - `learn` gera somente draft em `.qa-browser/knowledge/drafts/`; nunca promover automaticamente para playbook.
 - Credenciais e tokens nao devem aparecer em playbooks; use `valueEnv` ou entrada manual.
 
+## Gerenciamento de terminal com tmux
+
+Quando o agente precisar manter um runner, servidor ou outro comando longo
+ativo, usar o wrapper `scripts/qa-browser-tmux.sh`. Ele remove a dependencia de
+`stdin` do terminal do agente, mantem uma sessao nomeada e permite consultar o
+pane sem anexar a interface:
+
+```bash
+TMUX=/home/cayo/.codex/skills/qa-browser-session/scripts/qa-browser-tmux.sh
+
+$TMUX start -- node /home/cayo/.codex/skills/qa-browser-session/scripts/qa-browser.mjs \
+  assisted --profile local-assisted --remote-debugging-port 9333
+$TMUX status
+$TMUX capture
+$TMUX save
+$TMUX stop
+```
+
+O modo `assisted` grava evidencias incrementais enquanto o browser fica aberto
+e aceita `SIGUSR2` (ou `SIGINT`/`SIGTERM`) para encerramento limpo. `stop` deve ser preferido a
+`kill`, pois permite fechar trace, HAR, video e screenshot final. O wrapper nao
+deve receber credenciais ou segredos em `send`; autenticacao deve ocorrer pela
+UI ou por entrada manual protegida. Os chunks de trace ficam em
+`live-traces/`; `trace.zip` e materializado a partir do ultimo chunk no
+encerramento, enquanto a colecao completa permanece disponivel no diretorio.
+
 ## Recursos
 
 - Script principal: `scripts/qa-browser.mjs`.
